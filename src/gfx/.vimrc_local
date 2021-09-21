@@ -1,0 +1,1 @@
+set makeprg=make\ -C\ $HOME/build-kt-gfx
