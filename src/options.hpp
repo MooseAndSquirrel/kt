@@ -29,136 +29,13 @@ using key_t         = std::string_view;
 using value_t       = std::string_view;
 using arg_t         = std::pair<key_t, value_t>;
 using arg_store     = std::vector<arg_t>;
-class option
-{
-public:
-  using description_t = std::string_view;
-  option(key_t _k, char _sk, description_t _d)
-    : key_(_k)
-    , short_key_(_sk == 0? key_t {} : key_t { &_sk, 1 })
-    , description_(_d)
+
+auto decorated(key_t _k) -> std::string
   {
-    // long key cannot be empty
-    if(key_.empty()) 
-    { 
-      key_ = short_key_;
-    }
+    std::string result = _k.size() == 1? "-" : "--";
+    result += _k;
+    return result;
   }
-  option(key_t _k, description_t _d)
-    : option(_k, 0, _d)
-  {}
-  option(char _sk, description_t _d)
-    : option("", _sk, _d)
-  {}
-
-  auto key()              const -> key_t                { return key_; }
-  auto short_key()        const -> key_t                { return short_key_; }
-  auto description()      const -> description_t        { return description_; }
-  auto store(value_t _v)        -> void                 { do_store(_v); }
-  auto dispatch()         const -> void                 { do_dispatch(); }
-
-  template<typename ReturnT>
-    auto value() const -> std::optional<ReturnT> 
-    { 
-      std::optional<ReturnT> result;
-      if(type_id<ReturnT>() == type_id())
-      {
-        const void* vptr = do_fetch();
-        if(vptr)
-        {
-          result = *reinterpret_cast<ReturnT*>(vptr);
-        }
-      }
-      return result;
-    }
-  auto operator==(key_t _k) const -> bool
-    {
-      return _k == key() || _k == short_key();
-    }
-private:
-  key_t           key_;
-  key_t           short_key_;
-  description_t   description_;
-
-  virtual auto do_store(value_t _v)       -> void 
-    {
-      throw error_option_takes_no_value(_v);
-    }
-  virtual auto do_dispatch()        const -> void {};
-  virtual auto type_id()            const -> uintptr_t { return type_id<value_t>(); }
-  virtual auto do_fetch()           const -> const void* 
-    {
-      static value_t _default;
-      return &_default;
-    }
-protected:
-  template<typename ObjT>
-  static auto type_id() -> uintptr_t
-    {
-      static int        x  = 0;;
-      static uintptr_t  px = (uintptr_t)&x;
-      return px;
-    }
-
-  auto error_option_takes_no_value(value_t _v) -> std::runtime_error
-    {
-      auto msg = 
-        kt::concat("Option \"", key(), "\" takes no value, but was given value \"", _v, "\"");
-      return std::runtime_error(msg);
-    }
-};
-
-enum class value_is { absent, optional, required };
-
-template<typename T, value_is ValueConditional = value_is::absent>
-class for_type : public option
-{
-  using dispatch_fn   = std::function<void(const std::optional<T>&)>;
-public:
-  template<typename FnT>
-    for_type(key_t _k, char _sk, description_t _d, FnT&& _fn)
-      : option(_k, _sk, _d)
-      , dispatch_(_fn)
-    {}
-  template<typename FnT>
-    for_type(key_t _k, char _sk, description_t _d)
-      : option(_k, _sk, _d)
-    {}
-private:
-  std::optional<T>  opt_value_;
-  dispatch_fn       dispatch_;
-
-  virtual auto type_id()  const -> uintptr_t    final override { return option::type_id<T>(); }
-  virtual auto do_fetch() const -> const void*  final override { return opt_value_? &opt_value_.value() : nullptr; }
-
-  auto do_store(value_t _v) -> void
-    {
-      if(_v.empty())
-      {
-      }
-      else
-      {
-        if constexpr(ValueConditional == value_is::absent)
-        {
-          throw error_option_takes_no_value(_v);
-        }
-        else
-        {
-          opt_value_ = boost::lexical_cast<T>(_v);
-        }
-      }
-    }
-  auto do_dispatch() const -> void override
-    {
-      if(dispatch_)
-      {
-        dispatch_(opt_value_);
-      }
-    }
-};
-
-using table = std::vector<option>;
-
 auto parse(int argc, char* argv[]) -> arg_store
   {
     using namespace std;
@@ -190,7 +67,7 @@ auto parse(int argc, char* argv[]) -> arg_store
             auto ch = peek();
             if(ch == '-' || ch == '=')
             {
-              throw std::runtime_error(kt::concat("Unexpected \"", ch, "\" at beginning of arg \"", argstr, "\""));
+              throw std::runtime_error(concat("Unexpected \"", ch, "\" at beginning of arg \"", argstr, "\""));
             }
             auto begin = current_char;
             string_view key, value;
@@ -214,7 +91,7 @@ auto parse(int argc, char* argv[]) -> arg_store
             auto ch = peek();
             if(ch == '-' || ch == '=')
             {
-              throw std::runtime_error(kt::concat("Unexpected \"", ch, "\" at beginning of arg list \"", argstr, "\""));
+              throw std::runtime_error(concat("Unexpected \"", ch, "\" at beginning of arg list \"", argstr, "\""));
             }
             while(ch = peek())
             {
@@ -263,63 +140,177 @@ auto parse(int argc, char* argv[]) -> arg_store
     return opts;
   }
 
-using option_matches = std::vector<option>;
+enum class value_is { absent, optional, required };
 
-auto scan(const arg_store& _opts, const table& _handlers) -> option_matches
-  {
-    option_matches matches;
-    auto try_coupling = [&matches]
-      (const auto& opt, const auto& handler)
-      {
-        auto& key   = opt.first;
-        auto& value = opt.second;
-        if(key == handler.key() || key == handler.short_key())
+template<typename T, value_is VI = value_is::optional>
+class for_type final
+{
+  using handler_t         = std::function<void(key_t, value_t)>;
+public:
+  explicit for_type(const std::function<void(const T&)>& _ah)
+    {
+      handler_ = [&_ah](auto key, auto value)
         {
-          // push a copy of the handler onto the job list
-          matches.push_back(handler);
-          auto& new_handler = matches.back();
-          // store the value into the new handler object for later dispatch
-          if(value.size())
+          if(value.empty())
           {
-            new_handler.store(value); 
+            if constexpr(VI == value_is::required)
+            {
+              throw std::runtime_error(concat("option \"", decorated(key), "\" requires a value, but none was given"));
+            }
           }
-        }
-      };
-    auto validate = [&_handlers, &try_coupling]
-      (const auto& opt)
-      {
-        for(const auto& handler : _handlers)
-        {
-          try_coupling(opt, handler); 
-        }
-      };
-    for(const auto& opt : _opts)
-    {
-      validate(opt); 
+          else
+          {
+            if constexpr(VI == value_is::absent)
+            {
+              throw std::runtime_error(concat("option \"", decorated(key), "\" takes no value but was given \"", value, "\""));
+            }
+            auto v = boost::lexical_cast<T>(value);
+            _ah(v);
+          }
+        };
     }
-    return matches;
+  auto handler() const -> const handler_t& { return handler_; }
+private:
+  handler_t   handler_;
+};
+
+template<typename T>
+  auto value(T& _vref) -> for_type<T>
+  {
+    return for_type<T>([&_vref](const T& _v)
+      {
+        _vref = _v;
+      });
+  }
+class option final
+{
+public:
+  using handler_t = std::function<void(key_t, value_t)>;
+  using description_t = std::string_view;
+  option(key_t _k, char _c, description_t _d, const handler_t& _fn)
+      : long_key_(_k)
+      , short_key_(_c)
+      , description_(_d)
+      , handler_(_fn)
+    {}
+  template<typename TypeT, value_is ValueProvision = value_is::optional>
+  option(key_t _k, char _c, description_t _d, const for_type<TypeT, ValueProvision>& _ft)
+      : long_key_(_k)
+      , short_key_(_c)
+      , description_(_d)
+      , handler_(_ft.handler())
+    {}
+  option(key_t _k, char _c, description_t _d)
+      : option(_k, _c, _d, for_type<int, value_is::absent>([](auto){}))
+    {}
+  option(char _c, description_t _d)
+      : option(key_t {}, _c, _d, for_type<int, value_is::absent>([](auto){}))
+    {
+      // can't allow empty long option
+      long_key_ = short_key();
+    }
+  option(key_t _k, description_t _d)
+      : option(_k, 0, _d, for_type<int, value_is::absent>([](auto){}))
+    {}
+  auto set(value_t _v) const -> void
+    {
+      handler_(long_key_, _v);
+    }
+
+  auto short_key() const -> key_t { return short_key_ == 0? key_t {} : key_t { &short_key_, 1 }; }
+  auto long_key()  const -> key_t { return long_key_; }
+
+  auto operator==(key_t _k) const -> bool
+    {
+      return _k == long_key() || _k == short_key();
+    }
+private:
+  key_t           long_key_;
+  char            short_key_;
+  description_t   description_;
+  handler_t       handler_;
+};
+template<typename...ArgTs>
+auto make(ArgTs&&..._args) -> option 
+  { 
+    return option(std::forward<ArgTs>(_args)...); 
   }
 
-auto count(const option_matches& _matches, key_t _key) -> size_t
+using table       = std::vector<option>;
+using job         = std::function<void(void)>;
+using option_ref  = std::reference_wrapper<const option>;
+using jobs        = std::vector<std::pair<option_ref, job>>;
+
+auto scan(const arg_store& _args, const table& _opts) -> jobs
   {
-    size_t result = 0;
-    for(const auto& opt : _matches)
+    jobs results;
+    // skip the first arg, since it's just the executable name
+    auto arg = _args.begin();
+    for(++arg; arg != _args.end(); ++arg)
     {
-      if(opt == _key) { ++result; }
-    }
-    return result;
-  }
-using option_map = std::multimap<key_t, std::reference_wrapper<const option>>;
-auto map(const option_matches& _matches) -> option_map
-  {
-    option_map results;
-    for(const auto& option : _matches)
-    {
-      results.emplace(std::make_pair(option.key(), std::cref(option)));
+      auto arg_key    = arg->first;
+      auto arg_value  = arg->second;
+      bool no_match = true;
+      for(const auto& opt : _opts)
+      {
+        if(opt == arg_key)
+        {
+          no_match = false;
+          results.emplace_back(std::make_pair(std::cref(opt), [arg_value, &opt] { opt.set(arg_value); }));
+          break;
+        }
+      }
+      if(no_match)
+      {
+        throw std::runtime_error(concat("unrecognized option: ", decorated(arg_key)));
+      }
     }
     return results;
   }
 
+auto counts(const jobs& _jobs) -> std::map<key_t, size_t>
+  {
+    std::map<key_t, size_t> results;
+    for(const auto& job : _jobs)
+    {
+      results[job.first.get().long_key()] += 1;
+    }
+    return results;
+  }
+auto count(const jobs& _jobs, key_t _key) -> size_t
+  {
+    size_t result = 0;
+    for(const auto& job : _jobs)
+    {
+      if(job.first.get() == _key)
+      {
+        ++result;
+      }
+    }
+    return result;
+  }
+auto run(const jobs& _jobs) -> void
+  {
+    for(const auto& job : _jobs)
+    {
+      auto& do_action = job.second;
+      do_action(); 
+    }
+  }
+template<typename FnT>
+auto scan(const arg_store& _args, const table& _opts, FnT&& _pre_run) -> int
+  {
+    auto jobs = scan(_args, _opts);
+    if(_pre_run(jobs) == 0)
+    {
+      run(jobs);
+    }
+  }
+template<typename FnT>
+auto scan_run(const arg_store& _args, const table& _opts) -> void
+  {
+    scan(
+  }
 } /* namespace options */
 } /* namespace kt */
 #endif//kt_options_hpp_20210919_170150_PDT
