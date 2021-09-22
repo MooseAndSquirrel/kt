@@ -1,4 +1,4 @@
-#include "kt-ui.hpp"
+#include <kt/gfx/kt-ui.hpp>
 #include <stdexcept>
 
 UserInterface::UserInterface()

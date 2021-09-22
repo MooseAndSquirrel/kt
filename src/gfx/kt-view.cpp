@@ -1,4 +1,4 @@
-#include "kt-view.hpp"
+#include <kt/gfx/kt-view.hpp>
 #include <stdexcept>
 
 namespace /* anon */ {
