@@ -7,4 +7,4 @@ include_directories($ENV{HOME}/kt)
 add_executable(kt-options-demo
   kt-options-demo.cpp
   )
-target_link_libraries(kt-options-demo kt-terminal)
+target_link_libraries(kt-options-demo kt-options kt-terminal)

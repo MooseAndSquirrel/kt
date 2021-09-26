@@ -6,6 +6,10 @@
  ****************************************************************************/
 namespace kt {
   
+  inline auto concat(const char* head)
+  {
+    return std::string(head);
+  }
 template<typename HeadT>
   auto concat(HeadT&& head)
   {

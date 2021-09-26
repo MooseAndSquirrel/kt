@@ -1,2 +1,2 @@
-#include <kt/gfx/kt-ui.hpp>
-#include <kt/gfx/kt-view.hpp>
+#include <kt/gfx/ui.hpp>
+#include <kt/gfx/view.hpp>

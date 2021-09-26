@@ -8,4 +8,6 @@ add_subdirectory(gfx)
 add_library(kt-terminal
   terminal.cpp
   )
-
+add_library(kt-options
+  options.cpp
+  )

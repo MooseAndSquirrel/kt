@@ -24,6 +24,7 @@
 #include <kt/string/wrap.hpp>
 #include <kt/string/pad.hpp>
 #include <map>
+#include <fstream>
 namespace kt {
  
 namespace program_option {
@@ -40,118 +41,79 @@ using arg_store     = std::vector<arg_t>;         //!< Vector of arguments, stor
 auto decorated
     ( key_t _k        //!< Option key name.
     ) 
-    -> std::string
-  {
-    std::string result = _k.size() == 1? "-" : "--";
-    result += _k;
-    return result;
-  }
-/*! \brief    Parse the command line arguments into pairs of keys and values.
- *  \return   A vector of key/value `string_view` pairs.
- */
-auto parse(int argc, char* argv[]) -> arg_store
+    -> std::string;
+
+template<typename StreamT>
+auto parse(StreamT& _stream) -> arg_store
   {
     using namespace std;
-    arg_store opts;
-    arg_t     arg;
-    auto parse = [&](const char* argstr)
+    arg_store results;
+    size_t current_line = 0;
+    auto parse_line = [&](const auto& _line)
       {
-        auto current_char = argstr;
+        size_t symbol_start = 0;
+        size_t idx = 0;
+        size_t line_sz = _line.size();
+        auto end_of_line = [&]
+          {
+            return idx >= line_sz;
+          };
         auto peek = [&]
           {
-            return *current_char;
+            return end_of_line()? 0 :  _line[idx];
           };
-        auto advance = [&]
+        auto accept = [&]
           {
-            if(peek() != 0) ++current_char;
+            ++idx;
+          };
+        auto skip_whitespace = [&]
+          {
+            while(isspace(peek()))
+            {
+              accept();
+            }
+            symbol_start = idx;
+          };
+        auto parse_key = [&]
+          {
+            skip_whitespace();
+            string key;
+            char ch;
+            while(!isspace((ch = peek())) && end_of_line() == false)
+            {
+              key += ch; 
+            }
+            return key;
           };
         auto parse_value = [&]
           {
-            auto begin = current_char;
+            skip_whitespace();
+            string value;
             char ch;
-            while(ch = peek())
+            while(end_of_line() == false)
             {
-              advance();
+              value += ch; 
             }
-            return string_view(begin, current_char - begin);
+            return value;
           };
-        auto parse_long_arg = [&]
-          {
-            auto ch = peek();
-            if(ch == '-' || ch == '=')
-            {
-              throw std::runtime_error(concat("Unexpected \"", ch, "\" at beginning of arg \"", argstr, "\""));
-            }
-            auto begin = current_char;
-            string_view key, value;
-            while(ch = peek())
-            {
-              advance();
-              if(peek() == '=')
-              {
-                key = string_view(begin, current_char - begin);
-                advance();
-                value = parse_value();
-                opts.push_back(make_pair(key, value));
-                return;
-              }
-            }
-            key = string_view(begin, current_char - begin);
-            opts.push_back(make_pair(key, value));
-          };
-        auto parse_short_args = [&]
-          {
-            auto ch = peek();
-            if(ch == '-' || ch == '=')
-            {
-              throw std::runtime_error(concat("Unexpected \"", ch, "\" at beginning of arg list \"", argstr, "\""));
-            }
-            while(ch = peek())
-            {
-              auto key = string_view(current_char, 1);
-              advance();
-              if(peek() == '=')
-              {
-                advance();
-                auto value = parse_value();
-                opts.push_back(make_pair(key, value));
-                break;
-              }
-              opts.push_back(make_pair(key, string_view()));
-            }
-          };
-        auto parse_args = [&]
-          {
-            auto ch = peek();
-            if(ch == '-')
-            {
-              advance();
-              parse_long_arg();
-            }
-            else
-            {
-              parse_short_args();
-            }
-          };
-        auto ch = peek();
-        if(ch == '-')
-        {
-          advance();
-          parse_args();
-        }
-        else
-        {
-          auto value = parse_value();
-          opts.push_back(make_pair(string_view(), value));
-        }
-        
+        auto key   = parse_key();
+        auto value = parse_value();
+        results.push_back(make_pair(key, value));
       };
-    for(int arg = 0; arg < argc; ++arg)
+    string line;
+    while(getline(_stream, line))
     {
-      parse(argv[arg]);
+      ++current_line;
+      parse_line(line);
     }
-    return opts;
+    return results;
   }
+auto parse(const std::string& _filename) -> arg_store;
+
+/*! \brief    Parse the command line arguments into pairs of keys and values.
+ *  \return   A vector of key/value `string_view` pairs.
+ */
+auto parse(int argc, char* argv[]) -> arg_store;
 
 /*! \brief  Enum specifying whether an argument takes a value. */
 enum class value_is 
@@ -209,11 +171,22 @@ private:
 };
 
 template<typename T>
-  auto value(T& _vref) -> for_type<T>
+  auto value(T& _vref) -> for_type<T, value_is::required>
   {
-    return for_type<T>([&_vref](const T& _v)
+    return for_type<T, value_is::required>([&_vref](const std::optional<T>& _v)
       {
-        _vref = _v;
+        _vref = *_v;
+      });
+  }
+template<typename T>
+  auto opt_value(std::optional<T>& _vref) -> for_type<T, value_is::optional>
+  {
+    return for_type<T, value_is::optional>([&_vref](const std::optional<T>& _v)
+      {
+        if(_v)
+        {
+          _vref = *_v;
+        }
       });
   }
 
@@ -230,7 +203,7 @@ public:
         ( key_t             _k                            //!< Option key.                           
         , char              _c                            //!< Short key.                           
         , description_t     _d                            //!< Description text.           
-        , const handler_t&  _fn                           //!< Handler function.        
+        , handler_t         _fn                           //!< Handler function.        
         , allow_listing     _al = allow_listing::yes
         , process           _ap = process::normal       
         )
@@ -241,7 +214,7 @@ public:
       , is_listed_(_al)
       , process_(_ap)
     {}
-  template<typename TypeT, value_is ValueProvision = value_is::optional>
+  template<typename TypeT, value_is ValueProvision>
   option
         ( key_t                                   _k                           //!< Option key.
         , char                                    _c                           //!< Short key.
@@ -321,16 +294,40 @@ auto hidden(ArgTs&&...args) -> option
     return option(std::forward<ArgTs>(args)..., allow_listing::no);
   }
 template<typename StringT>
-auto text(StringT&& _description) -> option
+auto text(const StringT& _description) -> option
   {
     return option("", _description, allow_listing::yes, process::textonly);
   }
 template<typename StringT>
-auto heading(StringT&& _description) -> option
+auto heading(const StringT& _description) -> option
   {
     return option("", _description, allow_listing::yes, process::heading);
   }
 using table       = std::vector<option>;
+
+namespace detail {
+  inline auto merge_opts(table& _accum, const table& _head) -> void
+    {
+      for(auto& opt : _head)
+      {
+        _accum.push_back(opt);
+      }
+    }
+  template<typename HeadT, typename...TailTs>
+  auto merge_opts(table& _accum, const HeadT& _head, const TailTs&..._tail) -> void
+    {
+      merge_opts(_accum, _head);
+      merge_opts(_accum, _tail...);
+    }
+} /* namespace detail */
+
+template<typename HeadT, typename...TailTs>
+  auto merge_opts(const HeadT& _head, const TailTs&..._tail) -> table
+  {
+    table results;
+    detail::merge_opts(results, _head, _tail...);
+    return results;
+  }
 template<typename StreamT>
 auto operator<<(StreamT&& _stream, const table& _table) -> StreamT&
   {
@@ -391,65 +388,10 @@ using job         = std::function<void(void)>;
 using option_ref  = std::reference_wrapper<const option>;
 using jobs        = std::vector<std::pair<option_ref, job>>;
 
-auto scan(const arg_store& _args, const table& _opts) -> jobs
-  {
-    jobs results;
-    // skip the first arg, since it's just the executable name
-    auto arg = _args.begin();
-    for(++arg; arg != _args.end(); ++arg)
-    {
-      auto arg_key    = arg->first;
-      auto arg_value  = arg->second;
-      bool no_match = true;
-      for(const auto& opt : _opts)
-      {
-        if(opt.process_type() == process::normal)
-        {
-          if(opt == arg_key)
-          {
-            no_match = false;
-            results.emplace_back(std::make_pair(std::cref(opt), [arg_value, &opt] { opt.set(arg_value); }));
-            break;
-          }
-        }
-      }
-      if(no_match)
-      {
-        throw std::runtime_error(concat("unrecognized option: ", decorated(arg_key)));
-      }
-    }
-    return results;
-  }
-
-auto counts(const jobs& _jobs) -> std::map<key_t, size_t>
-  {
-    std::map<key_t, size_t> results;
-    for(const auto& job : _jobs)
-    {
-      results[job.first.get().long_key()] += 1;
-    }
-    return results;
-  }
-auto count(const jobs& _jobs, key_t _key) -> size_t
-  {
-    size_t result = 0;
-    for(const auto& job : _jobs)
-    {
-      if(job.first.get() == _key)
-      {
-        ++result;
-      }
-    }
-    return result;
-  }
-auto run(const jobs& _jobs) -> void
-  {
-    for(const auto& job : _jobs)
-    {
-      auto& do_action = job.second;
-      do_action(); 
-    }
-  }
+auto scan(const arg_store& _args, const table& _opts) -> jobs;
+auto job_map(const jobs& _jobs) -> std::multimap<key_t, job>;
+auto count(const jobs& _jobs, key_t _key) -> size_t;
+auto run(const jobs& _jobs) -> void;
 template<typename FnT>
 auto scan(const arg_store& _args, const table& _opts, FnT&& _pre_run) -> void
   {
@@ -464,6 +406,10 @@ auto scan_run(const arg_store& _args, const table& _opts) -> void
   {
     scan(_args, _opts, [](auto&&) { return 0; });
   }
+
+using env_map = std::map<std::string, std::string>;
+auto environ() -> env_map;
+
 } /* namespace options */
 } /* namespace kt */
 #endif//kt_options_hpp_20210919_170150_PDT
