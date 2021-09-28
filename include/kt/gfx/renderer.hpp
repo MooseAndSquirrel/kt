@@ -9,7 +9,7 @@ namespace gfx {
 class Renderer final
 {
 public:
-  static constexpr uint32_t default_flags = SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE;
+  static constexpr uint32_t default_flags = SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE | SDL_RENDERER_PRESENTVSYNC;
   Renderer(const Renderer&) = delete;
   Renderer(Renderer&&)      = default;
   Renderer(SDL_Window*, int _index = -1, uint32_t _flags = default_flags);
