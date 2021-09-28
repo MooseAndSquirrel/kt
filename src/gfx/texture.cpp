@@ -11,7 +11,8 @@ Texture::Texture(Renderer& _r, int _w, int _h, Color _c, int _access)
     _r.set_draw_blend(SDL_BLENDMODE_NONE);
     _r.clear();
     _r.set_draw_blend(SDL_BLENDMODE_BLEND);
-    set_blend_mode(SDL_BLENDMODE_BLEND);
+    set(SDL_BLENDMODE_BLEND);
+  }
   }
 Texture::Texture(Renderer& _r, int _w, int _h, int _access)
     : Texture(_r, _w, _h, Color::transparent(), _access)
@@ -38,7 +39,7 @@ auto Texture::release() -> void
     }
     texture_ = nullptr;
   }
-auto Texture::set_blend_mode(SDL_BlendMode _bm) -> void
+auto Texture::set(SDL_BlendMode _bm) -> void
   {
     sdl_assert(SDL_SetTextureBlendMode(texture_, _bm));
   }

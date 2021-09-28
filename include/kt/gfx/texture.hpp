@@ -18,7 +18,7 @@ public:
   ~Texture();
 
   auto reset(Renderer& _r, int _w, int _h, int _access = default_access) -> void;
-  auto set_blend_mode(SDL_BlendMode) -> void;
+  auto set(SDL_BlendMode) -> void;
   auto get() const ->       SDL_Texture*;
 private:
   mutable SDL_Texture*  texture_ = nullptr;
