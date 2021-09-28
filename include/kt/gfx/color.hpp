@@ -21,6 +21,27 @@ public:
   auto b() const -> uint8_t { return b_; }
   auto a() const -> uint8_t { return a_; }
 
+  auto set_r(uint8_t _v)    { r_ = _v; }
+  auto set_g(uint8_t _v)    { g_ = _v; }
+  auto set_b(uint8_t _v)    { b_ = _v; }
+  auto set_a(uint8_t _v)    { a_ = _v; }
+
+  auto operator+=(const Color& _c) -> Color&
+    {
+      r_ += _c.r_;
+      g_ += _c.g_;
+      b_ += _c.b_;
+      a_ += _c.a_;
+      return *this;
+    }
+  auto operator-=(const Color& _c) -> Color&
+    {
+      r_ -= _c.r_;
+      g_ -= _c.g_;
+      b_ -= _c.b_;
+      a_ -= _c.a_;
+      return *this;
+    }
   static constexpr auto black()       -> Color { return Color { 0x00, 0x00, 0x00 }; }
   static constexpr auto red()         -> Color { return Color { 0xFF, 0x00, 0x00 }; }
   static constexpr auto green()       -> Color { return Color { 0x00, 0xFF, 0x00 }; }
