@@ -58,6 +58,7 @@ auto UserInterface::handle(const SDL_Event& _event) -> void
       on_controller_axis_event(_event.caxis);
       break;
     case SDL_CONTROLLERBUTTONDOWN:
+    case SDL_CONTROLLERBUTTONUP:
       on_controller_button_event(_event.cbutton);
       break;
     case SDL_KEYDOWN:
