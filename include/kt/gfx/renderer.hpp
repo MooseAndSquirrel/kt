@@ -23,6 +23,7 @@ public:
   auto color(uint8_t, uint8_t, uint8_t) -> void;
   auto color(uint8_t, uint8_t, uint8_t, uint8_t) -> void;
   auto color(const Color& c) -> void;
+  auto get_color() -> Color;
   auto point(int, int) -> void;
   auto line(int, int, int, int) -> void;
   auto line_f(float, float, float, float) -> void;

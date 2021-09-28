@@ -155,5 +155,11 @@ auto Renderer::set_draw_blend(SDL_BlendMode _m) -> void
   {
     SDL_SetRenderDrawBlendMode(renderer_, _m);
   }
+auto Renderer::get_color() -> Color
+  {
+    uint8_t _r, _g, _b, _a;
+    sdl_assert(SDL_GetRenderDrawColor(renderer_, &_r, &_g, &_b, &_a));
+    return Color { _r, _g, _b, _a };
+  }
 } /* namespace gfx */
 } /* namespace kt */
