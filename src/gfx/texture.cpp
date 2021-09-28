@@ -13,6 +13,9 @@ Texture::Texture(Renderer& _r, int _w, int _h, Color _c, int _access)
     _r.set_draw_blend(SDL_BLENDMODE_BLEND);
     set(SDL_BLENDMODE_BLEND);
   }
+Texture::Texture(Renderer& _r, size _size, int _access)
+    : Texture(_r, _size.w, _size.h, _access)
+  {
   }
 Texture::Texture(Renderer& _r, int _w, int _h, int _access)
     : Texture(_r, _w, _h, Color::transparent(), _access)
