@@ -65,6 +65,7 @@ auto Renderer::circle(int _cx, int _cy, int _radius, bool _fill) -> void
     auto x_sq = x * x;
     auto x_trigger = x_sq - 2 * x - 1;;
     auto y = value(0);
+    set_draw_blend(SDL_BLENDMODE_NONE);
     std::function<void(int, int)> plot_circle = [&](auto x, auto y)
       {
         point(_cx - x, _cy + y);
