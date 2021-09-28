@@ -39,8 +39,10 @@ public:
   auto copy(const Texture& t, SDL_Rect& _src, SDL_Rect& _dest) -> void;
   auto copy(const Texture& t, int _x, int _y) -> void;
   auto copy(const Texture& t, int _x, int _y, double _angle) -> void;
+  auto copy(const Texture& _t, SDL_Rect& _src, SDL_Rect& _dest, double _angle) -> void;
 
   auto set_draw_blend(SDL_BlendMode) -> void;
+
 private:
   SDL_Renderer* renderer_ = nullptr;
 

@@ -133,6 +133,10 @@ auto Renderer::copy(const Texture& _t, SDL_Rect& _dest) -> void
   {
     sdl_assert(SDL_RenderCopy(renderer_, _t.get(), NULL, &_dest));
   }
+auto Renderer::copy(const Texture& _t, SDL_Rect& _src, SDL_Rect& _dest, double _angle) -> void
+  {
+    sdl_assert(SDL_RenderCopyEx(renderer_, _t.get(), &_src, &_dest, _angle, NULL, SDL_FLIP_NONE));
+  }
 auto Renderer::copy(const Texture& _t, SDL_Rect& _src, SDL_Rect& _dest) -> void
   {
     sdl_assert(SDL_RenderCopy(renderer_, _t.get(), &_src, &_dest));
