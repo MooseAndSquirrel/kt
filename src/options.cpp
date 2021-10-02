@@ -55,7 +55,7 @@ auto parse(int argc, char* argv[]) -> arg_store
           {
             auto begin = current_char;
             char ch;
-            while(ch = peek())
+            while((ch = peek()))
             {
               advance();
             }
@@ -70,7 +70,7 @@ auto parse(int argc, char* argv[]) -> arg_store
             }
             auto begin = current_char;
             string_view key, value;
-            while(ch = peek())
+            while((ch = peek()))
             {
               advance();
               if(peek() == '=')
@@ -92,7 +92,7 @@ auto parse(int argc, char* argv[]) -> arg_store
             {
               throw std::runtime_error(concat("Unexpected \"", ch, "\" at beginning of arg list \"", argstr, "\""));
             }
-            while(ch = peek())
+            while((ch = peek()))
             {
               auto key = string_view(current_char, 1);
               advance();
