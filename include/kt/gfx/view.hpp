@@ -1,7 +1,6 @@
 #ifndef view_hpp_20210914_164707_PDT
 #define view_hpp_20210914_164707_PDT
 #include "renderer.hpp"
-#include <SDL2/SDL.h>
 #include <tuple>
 namespace kt {
 namespace gfx {

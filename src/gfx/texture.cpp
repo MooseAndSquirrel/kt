@@ -1,5 +1,3 @@
-#include <kt/gfx/defs.hpp>
-#include <kt/gfx/texture.hpp>
 #include <kt/gfx/renderer.hpp>
 namespace kt {
 namespace gfx  {
@@ -13,6 +11,11 @@ Texture::Texture(Renderer& _r, int _w, int _h, Color _c, int _access)
     _r.set_draw_blend(SDL_BLENDMODE_BLEND);
     set(SDL_BLENDMODE_BLEND);
   }
+Texture::Texture(Texture&& _src)
+    : texture_(_src.texture_)
+  {
+    _src.texture_ = nullptr;
+  }
 Texture::Texture(Renderer& _r, size _size, int _access)
     : Texture(_r, _size.w, _size.h, _access)
   {
@@ -20,6 +23,12 @@ Texture::Texture(Renderer& _r, size _size, int _access)
 Texture::Texture(Renderer& _r, int _w, int _h, int _access)
     : Texture(_r, _w, _h, Color::transparent(), _access)
   {
+  }
+Texture::Texture(Renderer& _r, const std::string& _path)
+  {
+    auto surface  = sdl_assert(SDL_LoadBMP(_path.c_str()));
+    texture_      = sdl_assert(SDL_CreateTextureFromSurface(_r.get(), surface));
+    SDL_FreeSurface(surface);
   }
 Texture::~Texture()
   {
@@ -45,6 +54,12 @@ auto Texture::release() -> void
 auto Texture::set(SDL_BlendMode _bm) -> void
   {
     sdl_assert(SDL_SetTextureBlendMode(texture_, _bm));
+  }
+auto Texture::get_size() const -> size
+  {
+    size sz;
+    sdl_assert(SDL_QueryTexture(texture_, NULL, NULL, &sz.w, &sz.h));
+    return sz;
   }
 } /* namespace gfx */
 } /* namespace kt */

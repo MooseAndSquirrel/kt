@@ -1,9 +1,6 @@
 #ifndef renderer_hpp_20210924_181737_PDT
 #define renderer_hpp_20210924_181737_PDT
-#include <kt/gfx/color.hpp>
 #include <kt/gfx/texture.hpp>
-#include <kt/gfx/renderer.hpp>
-#include <kt/gfx/defs.hpp>
 namespace kt {
 namespace gfx {
 class Renderer final
